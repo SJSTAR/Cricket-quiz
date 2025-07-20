@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cricket Quiz Challenge</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Teko:wght@400;600;700&family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #0c140c;
+            overflow: hidden;
+            color: #f0fff0;
+            overflow: auto;
+        }
+        #three-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+        .font-teko { font-family: 'Teko', sans-serif; }
+        .quiz-container {
+            background: rgba(12, 20, 12, 0.7); /* Dark Greenish Black */
+            backdrop-filter: blur(12px);
+            border: 1px solid #2a402a;
+            box-shadow: 0px 0px 40px rgba(217, 185, 91, 0.3);
+            background-image: url('https://www.transparenttextures.com/patterns/crissxcross.png'),
+                              linear-gradient(rgba(12, 20, 12, 0.8), rgba(12, 20, 12, 0.8)),
+                              url('https://images.unsplash.com/photo-1599586120429-48281b6f0ece?q=80&w=1974&auto=format&fit=crop');
+            background-size: auto, cover, cover;
+            background-position: center;
+            background-blend-mode: overlay, normal, normal;
+        }
+        .btn {
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: none !important;
+        }
+        .btn-primary {
+            background: linear-gradient(90deg, #d9b95b, #b8860b); /* Gold gradient */
+            border: 1px solid #d4af37;
+            color: #101010;
+            box-shadow: 0 0 15px rgba(217, 185, 91, 0.4), inset 0 0 10px rgba(255,255,255,0.2);
+        }
+        .btn-primary:hover:not(:disabled) {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 0 25px rgba(217, 185, 91, 0.7), inset 0 0 10px rgba(255,255,255,0.3);
+        }
+        .btn-secondary {
+            background: rgba(42, 64, 42, 0.5); border: 1px solid #3e5e3e;
+        }
+        .btn-secondary:hover:not(:disabled) {
+            background: rgba(62, 94, 62, 0.7); transform: translateY(-2px);
+        }
+        .option-btn {
+            background: rgba(42, 64, 42, 0.4); border: 1px solid #3e5e3e;
+            transition: all 0.2s ease-in-out;
+        }
+        .option-btn:hover:not(:disabled) {
+            background: rgba(217, 185, 91, 0.3); border-color: #d9b95b; transform: scale(1.02);
+        }
+        .correct {
+            animation: correct-answer-anim 0.5s ease-out forwards;
+        }
+        .incorrect {
+            animation: incorrect-answer-anim 0.5s ease-out forwards;
+        }
+        .screen { display: none; animation: fadeIn 0.7s ease-in-out; }
+        .screen.active { display: block; }
+
+        #progress-bar { transition: width 0.5s ease-in-out; background-color: #d9b95b; }
+        
+        .icon { display: inline-block; width: 1.2em; height: 1.2em; vertical-align: middle; margin-right: 0.5em; }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes correct-answer-anim {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); background: rgba(46, 139, 87, 0.8); border-color: #3c8d5b; box-shadow: 0 0 20px rgba(46, 139, 87, 0.6); }
+            100% { transform: scale(1); background: rgba(46, 139, 87, 0.8); border-color: #3c8d5b; }
+        }
+        @keyframes incorrect-answer-anim {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-10px); }
+            40%, 80% { transform: translateX(10px); }
+        }
+        .loader { border: 4px solid #3e5e3e; border-top: 4px solid #d9b95b; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+    <canvas id="three-canvas"></canvas>
+
+    <div id="quiz-container" class="quiz-container w-full max-w-3xl mx-auto p-6 sm:p-8 rounded-2xl text-slate-200">
+        
+        <!-- Start Screen -->
+        <div id="start-screen" class="screen active text-center">
+            <h1 class="font-teko text-6xl sm:text-8xl font-bold uppercase tracking-wider text-white flex items-center justify-center" style="padding-bottom: 15px;">
+                Cricket Quiz
+            </h1>
+            <h2 class="font-teko text-5xl sm:text-7xl font-bold uppercase tracking-wider text-amber-400 -mt-4 sm:-mt-8 mb-6" >Challenge</h2>
+            
+            <div class="bg-black/20 p-4 rounded-lg mb-6 border border-green-900">
+                <h3 class="font-teko text-3xl text-white mb-2">✨ Create a Custom Quiz</h3>
+                <input type="text" id="custom-topic-input" class="w-full p-3 rounded-lg bg-green-950 text-white placeholder-green-200/50 border-2 border-green-800 focus:border-amber-400 focus:outline-none focus:ring-0" placeholder="e.g., 'The Ashes' or 'MS Dhoni'">
+                <button id="create-custom-quiz-btn" class="w-full mt-3 btn btn-primary font-bold py-3 px-8 rounded-full text-lg">Generate My Quiz</button>
+            </div>
+
+            <div id="loading-spinner" class="hidden loader mx-auto my-4"></div>
+            <p id="loading-text" class="hidden mb-4 text-lg text-amber-300"></p>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 justify-center mt-4">
+                 <button id="start-btn" class="btn btn-secondary font-bold py-3 px-8 rounded-full text-lg">General Quiz</button>
+                 <button id="guess-player-btn" class="btn btn-secondary font-bold py-3 px-8 rounded-full text-lg">Guess The Player</button>
+            </div>
+            <button id="get-fun-fact-btn" class="w-full mt-4 btn btn-secondary font-bold py-3 px-8 rounded-full text-lg">Daily Fun Fact</button>
+            
+            <div id="fun-fact-container" class="bg-black/20 p-4 rounded-lg mt-6 text-left hidden border border-green-900">
+                <h3 class="font-teko text-2xl text-amber-400 mb-2 text-center">✨ Cricket Fact of the Day</h3>
+                <div id="fun-fact-loader" class="hidden loader small-loader mx-auto"></div>
+                <p id="fun-fact-text" class="text-base text-center text-green-100"></p>
+            </div>
+        </div>
+
+        <!-- Quiz Screen -->
+        <div id="quiz-screen" class="screen">
+            <div class="mb-4">
+                <div class="flex justify-between items-center mb-2">
+                    <button id="back-btn" class="btn btn-secondary text-white font-bold py-2 px-4 rounded-full text-sm">&larr; Home</button>
+                    <div class="text-2xl font-teko font-semibold bg-black/30 px-4 py-1 rounded-lg border border-green-800">Score: <span id="score">0</span></div>
+                </div>
+                <div class="w-full bg-green-950 rounded-full h-2.5">
+                    <div id="progress-bar" class="h-2.5 rounded-full" style="width: 0%"></div>
+                </div>
+            </div>
+            <h2 id="question-title" class="font-teko text-4xl text-amber-300 mb-4">Question <span id="question-number"></span></h2>
+
+            <div id="question-card" class="bg-black/30 p-6 rounded-xl mb-6 border border-green-800 min-h-[120px] flex items-center justify-center">
+                <p id="question-text" class="text-xl sm:text-2xl text-center leading-relaxed text-white"></p>
+            </div>
+
+            <div id="options-container" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+            <div id="feedback-container" class="mt-6 text-center text-xl font-semibold min-h-[30px]"></div>
+            
+            <div class="flex flex-col sm:flex-row gap-4 mt-4">
+                <button id="explain-btn" class="w-full btn btn-secondary font-bold py-3 px-6 rounded-full text-lg hidden">Explain</button>
+                <button id="next-btn" class="w-full btn btn-primary font-bold py-3 px-6 rounded-full text-lg hidden">Next</button>
+            </div>
+            <div id="explanation-container" class="hidden mt-4 text-left bg-black/30 p-4 rounded-lg border border-green-800">
+                <div id="explanation-loader" class="hidden loader small-loader mx-auto"></div>
+                <p id="explanation-text" class="text-base"></p>
+            </div>
+        </div>
+        
+        <!-- Result Screen -->
+        <div id="result-screen" class="screen text-center">
+            <h2 class="font-teko text-6xl font-bold uppercase text-amber-400">Quiz Complete!</h2>
+            <p class="text-2xl mb-2 text-green-100">Your Final Score Is</p>
+            <p id="final-score" class="font-teko text-8xl font-bold my-4 text-white">0</p>
+            <p id="result-message" class="text-xl mb-8 text-amber-300"></p>
+            
+            <div id="analysis-container" class="hidden mt-6 text-left bg-black/30 p-4 rounded-lg border border-green-800">
+                <h3 class="font-teko text-3xl text-amber-400 mb-2 text-center">✨ Performance Analysis</h3>
+                <div id="analysis-spinner" class="hidden loader mx-auto"></div>
+                <p id="analysis-text" class="text-base whitespace-pre-wrap"></p>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-4 justify-center mt-8">
+                <button id="restart-btn" class="w-full sm:w-auto btn btn-secondary font-bold py-3 px-8 rounded-full text-lg">Play Again</button>
+                <button id="analyze-btn" class="w-full sm:w-auto btn btn-primary font-bold py-3 px-8 rounded-full text-lg">Analyze</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Hardcoded initial data ---
+        const initialQuizData = [
+            { question: "Who is known as the 'God of Cricket'?", options: ["Virat Kohli", "Sachin Tendulkar", "Don Bradman", "Ricky Ponting"], answer: "Sachin Tendulkar" },
+            { question: "Which country won the first ever Cricket World Cup in 1975?", options: ["Australia", "England", "India", "West Indies"], answer: "West Indies" },
+            { question: "How many balls are there in an over in cricket?", options: ["4", "5", "6", "7"], answer: "6" },
+            { question: "What is the term for a batsman getting out on the first ball they face?", options: ["Golden Duck", "Platinum Duck", "Diamond Duck", "Silver Duck"], answer: "Golden Duck" },
+            { question: "Which player has the most centuries in international cricket?", options: ["Ricky Ponting", "Virat Kohli", "Kumar Sangakkara", "Sachin Tendulkar"], answer: "Sachin Tendulkar" }
+        ];
+
+        // --- DOM Elements ---
+        const allScreens = document.querySelectorAll('.screen');
+        const startScreen = document.getElementById('start-screen');
+        const quizScreen = document.getElementById('quiz-screen');
+        const resultScreen = document.getElementById('result-screen');
+        
+        const createCustomQuizBtn = document.getElementById('create-custom-quiz-btn');
+
+        const startBtn = document.getElementById('start-btn');
+        const customTopicInput = document.getElementById('custom-topic-input');
+        const getFunFactBtn = document.getElementById('get-fun-fact-btn');
+        const guessPlayerBtn = document.getElementById('guess-player-btn');
+        const nextBtn = document.getElementById('next-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const analyzeBtn = document.getElementById('analyze-btn');
+        const backBtn = document.getElementById('back-btn');
+        const explainBtn = document.getElementById('explain-btn');
+
+        const loadingSpinner = document.getElementById('loading-spinner');
+        const loadingText = document.getElementById('loading-text');
+
+        const funFactContainer = document.getElementById('fun-fact-container');
+        const funFactLoader = document.getElementById('fun-fact-loader');
+        const funFactText = document.getElementById('fun-fact-text');
+
+        const progressBar = document.getElementById('progress-bar');
+        const questionNumberEl = document.getElementById('question-number');
+        const questionCard = document.getElementById('question-card');
+        const questionTextEl = document.getElementById('question-text');
+        const optionsContainer = document.getElementById('options-container');
+        const feedbackContainer = document.getElementById('feedback-container');
+        const explanationContainer = document.getElementById('explanation-container');
+        const explanationLoader = document.getElementById('explanation-loader');
+        const explanationText = document.getElementById('explanation-text');
+        
+        const scoreEl = document.getElementById('score');
+        const finalScoreEl = document.getElementById('final-score');
+        const resultMessageEl = document.getElementById('result-message');
+
+        const analysisContainer = document.getElementById('analysis-container');
+        const analysisSpinner = document.getElementById('analysis-spinner');
+        const analysisText = document.getElementById('analysis-text');
+
+        // --- Quiz State ---
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let quizData = [...initialQuizData];
+        let incorrectAnswers = [];
+        let soundEnabled = false;
+        
+        // --- Sound Effects ---
+        let synth, correctSound, incorrectSound, clickSound;
+        
+        function setupSounds() {
+            if (soundEnabled) return;
+            Tone.start();
+            correctSound = new Tone.Synth({ oscillator: { type: 'triangle' }, envelope: { attack: 0.005, decay: 0.1, sustain: 0.3, release: 1 } }).toDestination();
+            incorrectSound = new Tone.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.01, decay: 0.4, sustain: 0.1, release: 0.1 } }).toDestination();
+            clickSound = new Tone.Synth({ oscillator: { type: 'sine' }, envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.1 } }).toDestination();
+            soundEnabled = true;
+        }
+
+        // --- Event Listeners ---
+        document.body.addEventListener('click', setupSounds, { once: true });
+        startBtn.addEventListener('click', () => { quizData = [...initialQuizData]; startQuiz(); });
+        createCustomQuizBtn.addEventListener('click', handleCreateCustomQuiz);
+        getFunFactBtn.addEventListener('click', handleGetFunFact);
+        guessPlayerBtn.addEventListener('click', handleGuessThePlayer);
+        nextBtn.addEventListener('click', nextQuestion);
+        restartBtn.addEventListener('click', () => switchScreen(startScreen));
+        backBtn.addEventListener('click', () => switchScreen(startScreen));
+        analyzeBtn.addEventListener('click', handleAnalyzePerformance);
+        explainBtn.addEventListener('click', handleExplainAnswer);
+        
+        // --- Screen Management ---
+        function switchScreen(activeScreen) {
+            if (soundEnabled) clickSound.triggerAttackRelease('C5', '8n');
+            allScreens.forEach(screen => {
+                if (screen === activeScreen) {
+                    screen.classList.add('active');
+                } else {
+                    screen.classList.remove('active');
+                }
+            });
+            if (activeScreen === startScreen) {
+                analysisContainer.classList.add('hidden');
+                analysisText.innerText = '';
+                analyzeBtn.disabled = false;
+            }
+        }
+
+        /**
+         * A generic function to make API calls to the backend server.
+         * @param {object} payload - The data to send to the backend.
+         * @returns {Promise<any>} - The JSON response from the server.
+         */
+        async function callApi(payload) {
+            // This URL should point to your backend server, which will run on your local machine.
+            const backendUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=AIzaSyBHeIvzQBvX4SWU9IReNuqvFeGuQ_nNWzw';
+
+            const response = await fetch(backendUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload ) // Wrap the original payload
+            });
+
+            if (!response.ok) {
+                const errorInfo = await response.json();
+                console.error("API Error from backend:", errorInfo);
+                throw new Error(`Server responded with status: ${response.status}`);
+            }
+            return response.json();
+        }
+
+
+        // --- Gemini API Functions (via Backend) ---
+        
+        async function handleGuessThePlayer() {
+            toggleLoading(true, '✨ Creating a "Guess the Player" challenge...');
+            try {
+                const prompt = `Generate a single 'Guess the Player' cricket quiz question based on their career stats. The question should present key statistics (like runs, wickets, matches, etc.) and ask the user to identify the player. Provide 4 multiple-choice options, with one correct answer and three plausible distractors (e.g., contemporaries, teammates). Return the result as an array containing a single JSON object.`;
+                const newQuestions = await generateQuizQuestions(prompt);
+                quizData = newQuestions;
+                startQuiz();
+            } catch (error) {
+                alert("Sorry, we couldn't create the challenge right now. Please check if your backend server is running and try again.");
+            } finally {
+                toggleLoading(false);
+            }
+        }
+
+        async function handleExplainAnswer() {
+            explainBtn.disabled = true;
+            explanationContainer.classList.remove('hidden');
+            explanationLoader.classList.remove('hidden');
+            explanationText.innerText = "";
+            try {
+                const currentQuestion = quizData[currentQuestionIndex];
+                const prompt = `Please provide a short and interesting explanation for why '${currentQuestion.answer}' is the correct answer to the question: '${currentQuestion.question}'. Keep it concise and easy to understand.`;
+                const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
+                const result = await callApi(payload);
+                if (result.candidates && result.candidates[0].content.parts[0].text) {
+                    explanationText.innerText = result.candidates[0].content.parts[0].text;
+                } else { throw new Error("Invalid API response structure."); }
+            } catch (error) {
+                explanationText.innerText = "Sorry, we couldn't fetch an explanation right now.";
+            } finally {
+                explanationLoader.classList.add('hidden');
+            }
+        }
+
+        async function handleCreateCustomQuiz() {
+            const topic = customTopicInput.value.trim();
+            if (!topic) { alert("Please enter a topic for your custom quiz."); return; }
+            toggleLoading(true, `✨ Generating a quiz about ${topic}...`);
+            try {
+                const prompt = `Generate 10 unique, multiple-choice cricket quiz questions specifically about the following topic: "${topic}". If the topic is not related to cricket, generate questions about general cricket rules instead. Each question must have 4 options and one correct answer.`;
+                const newQuestions = await generateQuizQuestions(prompt);
+                quizData = newQuestions;
+                startQuiz();
+            } catch (error) {
+                alert("Sorry, we couldn't create a custom quiz at this moment. Please check if your backend server is running and try again.");
+            } finally {
+                toggleLoading(false);
+            }
+        }
+
+        async function generateQuizQuestions(prompt) {
+            const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json", responseSchema: { type: "ARRAY", items: { type: "OBJECT", properties: { question: { type: "STRING" }, options: { type: "ARRAY", items: { type: "STRING" } }, answer: { type: "STRING" } }, required: ["question", "options", "answer"] } } } };
+            const result = await callApi(payload);
+            if (result.candidates && result.candidates[0].content.parts[0].text) { return JSON.parse(result.candidates[0].content.parts[0].text); } 
+            else { throw new Error("Invalid API response structure."); }
+        }
+        
+        async function handleGetFunFact() {
+            funFactContainer.classList.remove('hidden');
+            funFactLoader.classList.remove('hidden');
+            funFactText.innerText = "";
+            getFunFactBtn.disabled = true;
+            try {
+                const prompt = "Tell me a surprising and interesting fun fact about the sport of cricket.";
+                const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
+                const result = await callApi(payload);
+                if (result.candidates && result.candidates[0].content.parts[0].text) {
+                    funFactText.innerText = result.candidates[0].content.parts[0].text;
+                } else { throw new Error("Invalid API response structure."); }
+            } catch (error) {
+                funFactText.innerText = "Sorry, couldn't fetch a fun fact right now. Please check if your backend server is running and try again.";
+            } finally {
+                funFactLoader.classList.add('hidden');
+                getFunFactBtn.disabled = false;
+            }
+        }
+
+        async function handleAnalyzePerformance() {
+            analysisContainer.classList.remove('hidden');
+            analysisSpinner.classList.remove('hidden');
+            analysisText.innerText = "";
+            analyzeBtn.disabled = true;
+            try {
+                const incorrectList = incorrectAnswers.map(item => `- Q: ${item.question}\n  A: ${item.answer}`).join('\n');
+                const prompt = `Analyze a user's cricket quiz performance. Score: ${score}/${quizData.length}. Incorrect answers:\n${incorrectList || 'None!'}\n\nProvide a brief, encouraging analysis. Suggest topics to study.`;
+                const payload = { contents: [{ role: "user", parts: [{ text: prompt }] }] };
+                const result = await callApi(payload);
+                 if (result.candidates && result.candidates[0].content.parts[0].text) {
+                    analysisText.innerText = result.candidates[0].content.parts[0].text;
+                } else { throw new Error("Invalid API response structure."); }
+            } catch (error) {
+                analysisText.innerText = "Sorry, we couldn't analyze your performance right now.";
+            } finally {
+                analysisSpinner.classList.add('hidden');
+            }
+        }
+
+        // --- UI Functions ---
+        
+        function toggleLoading(isLoading, text = '') {
+            loadingSpinner.classList.toggle('hidden', !isLoading);
+            loadingText.classList.toggle('hidden', !isLoading);
+            if(isLoading) loadingText.innerText = text;
+            startBtn.disabled = isLoading;
+            createCustomQuizBtn.disabled = isLoading;
+            guessPlayerBtn.disabled = isLoading;
+            getFunFactBtn.disabled = isLoading;
+        }
+
+        function startQuiz() {
+            switchScreen(quizScreen);
+            currentQuestionIndex = 0;
+            score = 0;
+            incorrectAnswers = [];
+            scoreEl.innerText = score;
+            quizData.sort(() => Math.random() - 0.5);
+            loadQuestion();
+        }
+
+        function loadQuestion() {
+            resetState();
+            const currentQuestion = quizData[currentQuestionIndex];
+            const progress = ((currentQuestionIndex + 1) / quizData.length) * 100;
+            progressBar.style.width = `${progress}%`;
+            questionNumberEl.innerText = `${currentQuestionIndex + 1}`;
+            
+            questionCard.style.animation = 'fadeOut 0.3s forwards';
+            setTimeout(() => {
+                questionTextEl.innerText = currentQuestion.question;
+                currentQuestion.options.forEach(option => {
+                    const button = document.createElement('button');
+                    button.innerText = option;
+                    button.classList.add('btn', 'option-btn', 'w-full', 'p-4', 'rounded-lg', 'text-left');
+                    button.addEventListener('click', selectAnswer);
+                    optionsContainer.appendChild(button);
+                });
+                questionCard.style.animation = 'fadeIn 0.3s forwards';
+            }, 300);
+        }
+
+        function resetState() {
+            nextBtn.classList.add('hidden');
+            explainBtn.classList.add('hidden');
+            explainBtn.disabled = false;
+            explanationContainer.classList.add('hidden');
+            explanationText.innerText = '';
+            feedbackContainer.innerText = '';
+            feedbackContainer.classList.remove('text-green-400', 'text-red-400');
+            while (optionsContainer.firstChild) {
+                optionsContainer.removeChild(optionsContainer.firstChild);
+            }
+        }
+
+        function selectAnswer(e) {
+            const selectedBtn = e.target;
+            const currentQuestion = quizData[currentQuestionIndex];
+            const correctAnswer = currentQuestion.answer;
+            // const isCorrect = selectedBtn.innerText === correctAnswer;
+            const isCorrect = selectedBtn.innerText.trim().toLowerCase() === correctAnswer.trim().toLowerCase();
+
+            if (isCorrect) {
+                if(soundEnabled) correctSound.triggerAttackRelease("C5", "8n", Tone.now());
+                score++;
+                scoreEl.innerText = score;
+                selectedBtn.classList.add('correct');
+                feedbackContainer.innerText = "SIX!";
+                feedbackContainer.classList.add('text-green-400');
+            } else {
+                if(soundEnabled) incorrectSound.triggerAttackRelease("C3", "4n", Tone.now());
+                selectedBtn.classList.add('incorrect');
+                feedbackContainer.innerText = `OUT! Correct answer: ${correctAnswer}`;
+                feedbackContainer.classList.add('text-red-400');
+                incorrectAnswers.push({ question: currentQuestion.question, selected: selectedBtn.innerText, answer: correctAnswer });
+            }
+            
+            Array.from(optionsContainer.children).forEach(button => {
+                button.disabled = true;
+                if (button.innerText === correctAnswer) button.classList.add('correct');
+            });
+
+            explainBtn.classList.remove('hidden');
+            if (currentQuestionIndex < quizData.length - 1) {
+                nextBtn.innerText = "Next Question";
+            } else {
+                nextBtn.innerText = "Show Results";
+            }
+            nextBtn.classList.remove('hidden');
+        }
+
+        function nextQuestion() {
+            currentQuestionIndex++;
+            if (currentQuestionIndex < quizData.length) {
+                loadQuestion();
+            } else {
+                showResults();
+            }
+        }
+
+        function showResults() {
+            switchScreen(resultScreen);
+            finalScoreEl.innerText = `${score} / ${quizData.length}`;
+            
+            const percentage = (score / quizData.length) * 100;
+            let message = '';
+            if (percentage === 100) {
+                message = "Perfect Score! You're a true Cricket Guru!";
+                confetti({ particleCount: 200, spread: 90, origin: { y: 0.6 } });
+            } else if (percentage >= 70) {
+                message = "Excellent Knowledge! You really know your cricket.";
+                confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+            } else if (percentage >= 40) {
+                message = "Good effort! A respectable score.";
+            } else {
+                message = "Keep learning! There's more to discover about cricket.";
+            }
+            resultMessageEl.innerText = message;
+        }
+        
+        // --- Three.js 3D Background ---
+        let scene, camera, renderer, ball;
+
+        function init3D() {
+            const canvas = document.getElementById('three-canvas');
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            renderer = new THREE.WebGLRenderer({ canvas: canvas, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+
+            // Cricket Ball
+            const geometry = new THREE.SphereGeometry(1, 32, 32);
+            const material = new THREE.MeshStandardMaterial({ 
+                color: 0x9d1a23, // Red
+                roughness: 0.6,
+                metalness: 0.2
+            });
+            ball = new THREE.Mesh(geometry, material);
+            
+            // Seam
+            const seamGeometry = new THREE.TorusGeometry(1, 0.03, 16, 100);
+            const seamMaterial = new THREE.MeshStandardMaterial({
+                color: 0xffffff,
+                roughness: 0.4
+            });
+            const seam1 = new THREE.Mesh(seamGeometry, seamMaterial);
+            seam1.rotation.x = Math.PI / 2;
+            const seam2 = new THREE.Mesh(seamGeometry, seamMaterial);
+            seam2.rotation.y = Math.PI / 2;
+            
+            ball.add(seam1);
+            ball.add(seam2);
+            
+            scene.add(ball);
+            
+            ball.position.z = -3;
+
+            // Lights
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+            const pointLight = new THREE.PointLight(0xffffff, 1);
+            pointLight.position.set(5, 5, 5);
+            scene.add(pointLight);
+
+            camera.position.z = 5;
+
+            animate3D();
+        }
+
+        function animate3D() {
+            requestAnimationFrame(animate3D);
+            ball.rotation.x += 0.005;
+            ball.rotation.y += 0.005;
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        window.addEventListener('resize', onWindowResize, false);
+        
+        // --- Initial Load ---
+        document.addEventListener('DOMContentLoaded', () => {
+            init3D();
+        });
+
+    </script>
+</body>
+</html>
